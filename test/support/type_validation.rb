@@ -4,12 +4,12 @@ module TypeValidation
   module SimpleTypeTests
     TYPES = {
       'integer' => 5,
-      'number'  => 5.0,
-      'string'  => 'str',
+      'number' => 5.0,
+      'string' => 'str',
       'boolean' => true,
-      'object'  => {},
-      'array'   => [],
-      'null'    => nil
+      'object' => {},
+      'array' => [],
+      'null' => nil,
     }
 
     TYPES.each do |name, value|
@@ -17,12 +17,12 @@ module TypeValidation
 
       define_method(:"test_#{name}_type_property") do
         schema = {
-          'properties' => { 'a' => { 'type' => name } }
+          'properties' => { 'a' => { 'type' => name } },
         }
-        assert_valid schema, {'a' => value}
+        assert_valid schema, { 'a' => value }
 
         other_values.each do |other_value|
-          refute_valid schema, {'a' => other_value}
+          refute_valid schema, { 'a' => other_value }
         end
       end
 
@@ -38,7 +38,7 @@ module TypeValidation
     end
 
     def test_type_union
-      schema = { 'type' => ['integer', 'string'] }
+      schema = { 'type' => %w[integer string] }
       assert_valid schema, 5
       assert_valid schema, 'str'
       refute_valid schema, nil
@@ -51,7 +51,7 @@ module TypeValidation
     def test_any_type
       schema = { 'type' => 'any' }
 
-      SimpleTypeTests::TYPES.values.each do |value|
+      SimpleTypeTests::TYPES.each_value do |value|
         assert_valid schema, value
       end
     end
@@ -64,18 +64,18 @@ module TypeValidation
         'properties' => {
           'a' => {
             'type' => [
-              {'type' => 'string'},
-              {'type' => 'object', 'properties' => { 'b' => { 'type' => 'integer' }}}
-            ]
-          }
-        }
+              { 'type' => 'string' },
+              { 'type' => 'object', 'properties' => { 'b' => { 'type' => 'integer' } } },
+            ],
+          },
+        },
       }
 
-      assert_valid schema, {'a' => 'test'}
-      refute_valid schema, {'a' => 5}
+      assert_valid schema, { 'a' => 'test' }
+      refute_valid schema, { 'a' => 5 }
 
-      assert_valid schema, {'a' => {'b' => 5}}
-      refute_valid schema, {'a' => {'b' => 'taco'}}
+      assert_valid schema, { 'a' => { 'b' => 5 } }
+      refute_valid schema, { 'a' => { 'b' => 'taco' } }
     end
   end
 end

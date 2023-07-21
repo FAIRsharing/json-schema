@@ -11,11 +11,12 @@ module JSON
 
         schema['required'].each do |property, property_schema|
           next if data.has_key?(property.to_s)
+
           prop_defaults = options[:insert_defaults] &&
                           defined_properties &&
                           defined_properties[property] &&
-                          !defined_properties[property]["default"].nil? &&
-                          !defined_properties[property]["readonly"]
+                          !defined_properties[property]['default'].nil? &&
+                          !defined_properties[property]['readonly']
 
           if !prop_defaults
             message = "The property '#{build_fragment(fragments)}' did not contain a required property of '#{property}'"
