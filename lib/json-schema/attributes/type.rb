@@ -25,14 +25,14 @@ module JSON
             valid = data_valid_for_type?(data, type)
           elsif type.is_a?(Hash) && union
             # Validate as a schema
-            schema = JSON::Schema.new(type,current_schema.uri,validator)
+            schema = JSON::Schema.new(type, current_schema.uri, validator)
 
             # We're going to add a little cruft here to try and maintain any validation errors that occur in this union type
             # We'll handle this by keeping an error count before and after validation, extracting those errors and pushing them onto a union error
             pre_validation_error_count = validation_errors(processor).count
 
             begin
-              schema.validate(data,fragments,processor,options.merge(:disallow => false))
+              schema.validate(data, fragments, processor, options.merge(disallow: false))
               valid = true
             rescue ValidationError
               # We don't care that these schemas don't validate - we only care that one validated
@@ -51,6 +51,7 @@ module JSON
 
         if options[:disallow]
           return if !valid
+
           message = "The property '#{build_fragment(fragments)}' matched one or more of the following types: #{list_types(types)}"
           validation_error(processor, message, fragments, current_schema, self, options[:record_errors])
         elsif !valid

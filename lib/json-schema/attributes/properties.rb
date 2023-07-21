@@ -4,7 +4,7 @@ module JSON
   class Schema
     class PropertiesAttribute < Attribute
       def self.required?(schema, options)
-        schema.fetch('required') { options[:strict] }
+        schema.fetch('required') { options[:allPropertiesRequired] }
       end
 
       def self.validate(current_schema, data, fragments, processor, validator, options = {})
@@ -15,9 +15,9 @@ module JSON
           property = property.to_s
 
           if !data.key?(property) &&
-              options[:insert_defaults] &&
-              property_schema.has_key?('default') &&
-              !property_schema['readonly']
+             options[:insert_defaults] &&
+             property_schema.has_key?('default') &&
+             !property_schema['readonly']
             default = property_schema['default']
             data[property] = default.is_a?(Hash) ? default.clone : default
           end
@@ -33,8 +33,8 @@ module JSON
           end
         end
 
-        # When strict is true, ensure no undefined properties exist in the data
-        return unless options[:strict] == true && !schema.key?('additionalProperties')
+        # When noAdditionalProperties is true, ensure no undefined properties exist in the data
+        return unless options[:noAdditionalProperties] == true && !schema.key?('additionalProperties')
 
         diff = data.select do |k, v|
           k = k.to_s
@@ -55,7 +55,7 @@ module JSON
           end
         end
 
-        if diff.size > 0
+        unless diff.empty?
           properties = diff.keys.join(', ')
           message = "The property '#{build_fragment(fragments)}' contained undefined properties: '#{properties}'"
           validation_error(processor, message, fragments, current_schema, self, options[:record_errors])

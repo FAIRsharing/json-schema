@@ -5,21 +5,21 @@ module ArrayValidation
 
       assert_valid schema, []
       assert_valid schema, ['a']
-      assert_valid schema, ['a', 'b']
+      assert_valid schema, %w[a b]
 
       refute_valid schema, [1]
       refute_valid schema, ['a', 1]
 
       # other types are disregarded
-      assert_valid schema, {'a' => 'foo'}
+      assert_valid schema, { 'a' => 'foo' }
     end
 
     def test_items_multiple_schemas
       schema = {
         'items' => [
           { 'type' => 'string' },
-          { 'type' => 'integer' }
-        ]
+          { 'type' => 'integer' },
+        ],
       }
 
       assert_valid schema, ['b', 1]
@@ -58,9 +58,9 @@ module ArrayValidation
       schema = {
         'items' => [
           { 'type' => 'integer' },
-          { 'type' => 'string' }
+          { 'type' => 'string' },
         ],
-        'additionalItems' => false
+        'additionalItems' => false,
       }
 
       assert_valid schema, [1, 'string']
@@ -74,9 +74,9 @@ module ArrayValidation
       schema = {
         'items' => [
           { 'type' => 'integer' },
-          { 'type' => 'string' }
+          { 'type' => 'string' },
         ],
-        'additionalItems' => { 'type' => 'integer' }
+        'additionalItems' => { 'type' => 'integer' },
       }
 
       assert_valid schema, [1, 'string']
@@ -98,15 +98,15 @@ module ArrayValidation
       assert_valid schema, [4, 4.1]
       refute_valid schema, [4, 4]
 
-      assert_valid schema, ['a', 'ab']
-      refute_valid schema, ['a', 'a']
+      assert_valid schema, %w[a ab]
+      refute_valid schema, %w[a a]
 
       assert_valid schema, [[1], [2]]
       refute_valid schema, [[1], [1]]
 
-      assert_valid schema, [{'b' => 1}, {'c' => 2}]
-      assert_valid schema, [{'b' => 1}, {'c' => 1}]
-      refute_valid schema, [{'b' => 1}, {'b' => 1}]
+      assert_valid schema, [{ 'b' => 1 }, { 'c' => 2 }]
+      assert_valid schema, [{ 'b' => 1 }, { 'c' => 1 }]
+      refute_valid schema, [{ 'b' => 1 }, { 'b' => 1 }]
     end
   end
 end

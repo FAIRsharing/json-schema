@@ -1,7 +1,6 @@
 require File.expand_path('../support/test_helper', __FILE__)
 
 class ValidatorSchemaReaderTest < Minitest::Test
-
   class MockReader < JSON::Schema::Reader
     def read(location)
       return super unless location.to_s == 'http://any.url/at/all'
@@ -9,7 +8,7 @@ class ValidatorSchemaReaderTest < Minitest::Test
       schema = {
         '$schema' => 'http://json-schema.org/draft-04/schema#',
         'type' => 'string',
-        'minLength' => 2
+        'minLength' => 2,
       }
 
       JSON::Schema.new(schema, Addressable::URI.parse(location.to_s))
@@ -41,15 +40,14 @@ class ValidatorSchemaReaderTest < Minitest::Test
   def test_validate_with_reader
     reader = MockReader.new
     schema = { '$ref' => 'http://any.url/at/all' }
-    assert_valid schema, 'abc', :schema_reader => reader
-    refute_valid schema, 'a', :schema_reader => reader
+    assert_valid schema, 'abc', schema_reader: reader
+    refute_valid schema, 'a', schema_reader: reader
   end
 
   def test_validate_list_with_reader
     reader = MockReader.new
     schema = { '$ref' => 'http://any.url/at/all' }
-    assert_valid schema, ['abc', 'def'], :schema_reader => reader, :list => true
-    refute_valid schema, ['abc', 'a'], :schema_reader => reader, :list => true
+    assert_valid schema, %w[abc def], schema_reader: reader, list: true
+    refute_valid schema, %w[abc a], schema_reader: reader, list: true
   end
-
 end

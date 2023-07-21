@@ -9,8 +9,8 @@ class CommonTestSuiteTest < Minitest::Test
   def setup
     Dir["#{TEST_DIR}/../remotes/**/*.json"].each do |path|
       schema = path.sub(%r{^.*/remotes/}, '')
-      stub_request(:get, "http://localhost:1234/#{schema}").
-        to_return(:body => File.read(path), :status => 200)
+      stub_request(:get, "http://localhost:1234/#{schema}")
+        .to_return(body: File.read(path), status: 200)
     end
   end
 
@@ -26,13 +26,13 @@ class CommonTestSuiteTest < Minitest::Test
     version = File.basename(suite).to_sym
     Dir["#{suite}/**/*.json"].each do |tfile|
       test_list = JSON.parse(File.read(tfile))
-      rel_file = tfile[TEST_DIR.length+1..-1]
+      rel_file = tfile[TEST_DIR.length + 1..-1]
 
       test_list.each do |test|
-        schema = test["schema"]
-        base_description = test["description"]
+        schema = test['schema']
+        base_description = test['description']
 
-        test["tests"].each do |t|
+        test['tests'].each do |t|
           full_description = "#{base_description}/#{t['description']}"
 
           next if rel_file.include?('/optional/') && skip?(full_description, rel_file)
@@ -42,12 +42,12 @@ class CommonTestSuiteTest < Minitest::Test
             skip if self.class.skip?(full_description, rel_file)
 
             errors = JSON::Validator.fully_validate(schema,
-              t["data"],
-              :parse_data => false,
-              :validate_schema => true,
-              :version => version
-            )
-            assert_equal t["valid"], errors.empty?, "Common test suite case failed: #{err_id}"
+                                                    t['data'],
+                                                    parse_data: false,
+                                                    validate_schema: true,
+                                                    version: version,
+                                                   )
+            assert_equal t['valid'], errors.empty?, "Common test suite case failed: #{err_id}"
           end
         end
       end
