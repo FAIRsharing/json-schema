@@ -7,18 +7,20 @@ module JSON
         # Create an hash to hold errors that are generated during validation
         errors = Hash.new { |hsh, k| hsh[k] = [] }
         valid = true
+        message = nil
 
         current_schema.schema['allOf'].each_with_index do |element, schema_index|
-          schema = JSON::Schema.new(element,current_schema.uri,validator)
+          schema = JSON::Schema.new(element, current_schema.uri, validator)
 
           # We're going to add a little cruft here to try and maintain any validation errors that occur in the allOf
           # We'll handle this by keeping an error count before and after validation, extracting those errors and pushing them onto an error array
           pre_validation_error_count = validation_errors(processor).count
 
           begin
-            schema.validate(data,fragments,processor,options)
-          rescue ValidationError
+            schema.validate(data, fragments, processor, options)
+          rescue ValidationError => e
             valid = false
+            message = e.message
           end
 
           diff = validation_errors(processor).count - pre_validation_error_count
@@ -29,7 +31,7 @@ module JSON
         end
 
         if !valid || !errors.empty?
-          message = "The property '#{build_fragment(fragments)}' of type #{type_of_data(data)} did not match all of the required schemas"
+          message ||= "The property '#{build_fragment(fragments)}' of type #{type_of_data(data)} did not match all of the required schemas"
           validation_error(processor, message, fragments, current_schema, self, options[:record_errors])
           validation_errors(processor).last.sub_errors = errors
         end

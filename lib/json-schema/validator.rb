@@ -15,21 +15,21 @@ require 'json-schema/errors/json_parse_error'
 require 'json-schema/util/uri'
 
 module JSON
-
   class Validator
-
     @@schemas = {}
     @@cache_schemas = true
     @@default_opts = {
-      :list => false,
-      :version => nil,
-      :validate_schema => false,
-      :record_errors => false,
-      :errors_as_objects => false,
-      :insert_defaults => false,
-      :clear_cache => false,
-      :strict => false,
-      :parse_data => true
+      list: false,
+      version: nil,
+      validate_schema: false,
+      record_errors: false,
+      errors_as_objects: false,
+      insert_defaults: false,
+      clear_cache: false,
+      strict: false,
+      allPropertiesRequired: false,
+      noAdditionalProperties: false,
+      parse_data: true,
     }
     @@validators = {}
     @@default_validator = nil
@@ -38,16 +38,22 @@ module JSON
     @@serializer = nil
     @@mutex = Mutex.new
 
-    def initialize(schema_data, opts={})
+    def initialize(schema_data, opts = {})
       @options = @@default_opts.clone.merge(opts)
       @errors = []
 
       configured_validator = self.class.validator_for_name(@options[:version])
       @options[:schema_reader] ||= self.class.schema_reader
 
-      @validation_options = @options[:record_errors] ? {:record_errors => true} : {}
+      @validation_options = @options[:record_errors] ? { record_errors: true } : {}
       @validation_options[:insert_defaults] = true if @options[:insert_defaults]
-      @validation_options[:strict] = true if @options[:strict] == true
+      if @options[:strict] == true
+        @validation_options[:allPropertiesRequired] = true
+        @validation_options[:noAdditionalProperties] = true
+      else
+        @validation_options[:allPropertiesRequired] = true if @options[:allPropertiesRequired]
+        @validation_options[:noAdditionalProperties] = true if @options[:noAdditionalProperties]
+      end
       @validation_options[:clear_cache] = true if !@@cache_schemas || @options[:clear_cache]
 
       @@mutex.synchronize { @base_schema = initialize_schema(schema_data, configured_validator) }
@@ -56,7 +62,7 @@ module JSON
       # validate the schema, if requested
       if @options[:validate_schema]
         # Don't clear the cache during metaschema validation!
-        meta_validator = self.class.new(@base_schema.validator.metaschema, {:clear_cache => false})
+        meta_validator = self.class.new(@base_schema.validator.metaschema, { clear_cache: false })
         meta_validator.validate(@base_schema.schema)
       end
 
@@ -68,11 +74,11 @@ module JSON
 
     def schema_from_fragment(base_schema, fragment)
       schema_uri = base_schema.uri
-      fragments = fragment.split("/").map { |f| f.gsub('~0', '~').gsub('~1', '/') }
+      fragments = fragment.split('/').map { |f| f.gsub('~0', '~').gsub('~1', '/') }
 
       # ensure the first element was a hash, per the fragment spec
-      if fragments.shift != "#"
-        raise JSON::Schema::SchemaError.new("Invalid fragment syntax in :fragment option")
+      if fragments.shift != '#'
+        raise JSON::Schema::SchemaError, 'Invalid fragment syntax in :fragment option'
       end
 
       schema_fragment = base_schema.schema
@@ -86,7 +92,7 @@ module JSON
       end
 
       unless schema_fragment.is_a?(Hash)
-        raise JSON::Schema::SchemaError.new("Invalid fragment resolution for :fragment option")
+        raise JSON::Schema::SchemaError, 'Invalid fragment resolution for :fragment option'
       end
 
       schema = JSON::Schema.new(schema_fragment, schema_uri, base_schema.validator)
@@ -104,13 +110,13 @@ module JSON
     def validate(data)
       original_data = data
       data = initialize_data(data)
-      @base_schema.validate(data,[],self,@validation_options)
+      @base_schema.validate(data, [], self, @validation_options)
 
       if @options[:record_errors]
         if @options[:errors_as_objects]
-          @errors.map{|e| e.to_hash}
+          @errors.map { |e| e.to_hash }
         else
-          @errors.map{|e| e.to_string}
+          @errors.map { |e| e.to_string }
         end
       else
         true
@@ -143,13 +149,13 @@ module JSON
       schema = parent_schema.schema
 
       # Build ref schemas if they exist
-      if schema["$ref"]
-        load_ref_schema(parent_schema, schema["$ref"])
+      if schema['$ref']
+        load_ref_schema(parent_schema, schema['$ref'])
       end
 
-      case schema["extends"]
+      case schema['extends']
       when String
-        load_ref_schema(parent_schema, schema["extends"])
+        load_ref_schema(parent_schema, schema['extends'])
       when Array
         schema['extends'].each do |type|
           handle_schema(parent_schema, type)
@@ -157,7 +163,7 @@ module JSON
       end
 
       # Check for schemas in union types
-      ["type", "disallow"].each do |key|
+      %w[type disallow].each do |key|
         if schema[key].is_a?(Array)
           schema[key].each do |type|
             if type.is_a?(Hash)
@@ -171,6 +177,7 @@ module JSON
       # are themselves schemas.
       %w[definitions properties patternProperties].each do |key|
         next unless value = schema[key]
+
         value.each do |k, inner_schema|
           handle_schema(parent_schema, inner_schema)
         end
@@ -179,20 +186,22 @@ module JSON
       # Schema properties whose values are themselves schemas.
       %w[additionalProperties additionalItems dependencies extends].each do |key|
         next unless schema[key].is_a?(Hash)
+
         handle_schema(parent_schema, schema[key])
       end
 
       # Schema properties whose values may be an array of schemas.
       %w[allOf anyOf oneOf not].each do |key|
         next unless value = schema[key]
+
         Array(value).each do |inner_schema|
           handle_schema(parent_schema, inner_schema)
         end
       end
 
       # Items are always schemas
-      if schema["items"]
-        items = schema["items"].clone
+      if schema['items']
+        items = schema['items'].clone
         items = [items] unless items.is_a?(Array)
 
         items.each do |item|
@@ -201,10 +210,9 @@ module JSON
       end
 
       # Convert enum to a ArraySet
-      if schema["enum"].is_a?(Array)
-        schema["enum"] = ArraySet.new(schema["enum"])
+      if schema['enum'].is_a?(Array)
+        schema['enum'] = ArraySet.new(schema['enum'])
       end
-
     end
 
     # Either load a reference schema or create a new schema
@@ -227,58 +235,57 @@ module JSON
       @errors
     end
 
-
     class << self
-      def validate(schema, data,opts={})
+      def validate(schema, data, opts = {})
         begin
           validate!(schema, data, opts)
         rescue JSON::Schema::ValidationError, JSON::Schema::SchemaError
-          return false
+          false
         end
       end
 
-      def validate_json(schema, data, opts={})
-        validate(schema, data, opts.merge(:json => true))
+      def validate_json(schema, data, opts = {})
+        validate(schema, data, opts.merge(json: true))
       end
 
-      def validate_uri(schema, data, opts={})
-        validate(schema, data, opts.merge(:uri => true))
+      def validate_uri(schema, data, opts = {})
+        validate(schema, data, opts.merge(uri: true))
       end
 
-      def validate!(schema, data,opts={})
+      def validate!(schema, data, opts = {})
         validator = new(schema, opts)
         validator.validate(data)
       end
 
-      def validate2(schema, data, opts={})
-        warn "[DEPRECATION NOTICE] JSON::Validator#validate2 has been replaced by JSON::Validator#validate! and will be removed in version >= 3. Please use the #validate! method instead."
+      def validate2(schema, data, opts = {})
+        warn '[DEPRECATION NOTICE] JSON::Validator#validate2 has been replaced by JSON::Validator#validate! and will be removed in version >= 3. Please use the #validate! method instead.'
         validate!(schema, data, opts)
       end
 
-      def validate_json!(schema, data, opts={})
-        validate!(schema, data, opts.merge(:json => true))
+      def validate_json!(schema, data, opts = {})
+        validate!(schema, data, opts.merge(json: true))
       end
 
-      def validate_uri!(schema, data, opts={})
-        validate!(schema, data, opts.merge(:uri => true))
+      def validate_uri!(schema, data, opts = {})
+        validate!(schema, data, opts.merge(uri: true))
       end
 
-      def fully_validate(schema, data, opts={})
-        validate!(schema, data, opts.merge(:record_errors => true))
+      def fully_validate(schema, data, opts = {})
+        validate!(schema, data, opts.merge(record_errors: true))
       end
 
-      def fully_validate_schema(schema, opts={})
+      def fully_validate_schema(schema, opts = {})
         data = schema
         schema = validator_for_name(opts[:version]).metaschema
         fully_validate(schema, data, opts)
       end
 
-      def fully_validate_json(schema, data, opts={})
-        fully_validate(schema, data, opts.merge(:json => true))
+      def fully_validate_json(schema, data, opts = {})
+        fully_validate(schema, data, opts.merge(json: true))
       end
 
-      def fully_validate_uri(schema, data, opts={})
-        fully_validate(schema, data, opts.merge(:uri => true))
+      def fully_validate_uri(schema, data, opts = {})
+        fully_validate(schema, data, opts.merge(uri: true))
       end
 
       def schema_reader
@@ -318,7 +325,7 @@ module JSON
       end
 
       def cache_schemas=(val)
-        warn "[DEPRECATION NOTICE] Schema caching is now a validation option. Schemas will still be cached if this is set to true, but this method will be removed in version >= 3. Please use the :clear_cache validation option instead."
+        warn '[DEPRECATION NOTICE] Schema caching is now a validation option. Schemas will still be cached if this is set to true, but this method will be removed in version >= 3. Please use the :clear_cache validation option instead.'
         @@cache_schemas = val == true ? true : false
       end
 
@@ -330,32 +337,34 @@ module JSON
         @@default_validator
       end
 
-      def validator_for_uri(schema_uri, raise_not_found=true)
+      def validator_for_uri(schema_uri, raise_not_found = true)
         return default_validator unless schema_uri
+
         u = JSON::Util::URI.parse(schema_uri)
         validator = validators["#{u.scheme}://#{u.host}#{u.path}"]
         if validator.nil? && raise_not_found
-          raise JSON::Schema::SchemaError.new("Schema not found: #{schema_uri}")
+          raise JSON::Schema::SchemaError, "Schema not found: #{schema_uri}"
         else
           validator
         end
       end
 
-      def validator_for_name(schema_name, raise_not_found=true)
+      def validator_for_name(schema_name, raise_not_found = true)
         return default_validator unless schema_name
+
         schema_name = schema_name.to_s
         validator = validators.values.detect do |v|
           Array(v.names).include?(schema_name)
         end
         if validator.nil? && raise_not_found
-          raise JSON::Schema::SchemaError.new("The requested JSON schema version is not supported")
+          raise JSON::Schema::SchemaError, 'The requested JSON schema version is not supported'
         else
           validator
         end
       end
 
       def validator_for(schema_uri)
-        warn "[DEPRECATION NOTICE] JSON::Validator#validator_for has been replaced by JSON::Validator#validator_for_uri and will be removed in version >= 3. Please use the #validator_for_uri method instead."
+        warn '[DEPRECATION NOTICE] JSON::Validator#validator_for has been replaced by JSON::Validator#validator_for_uri and will be removed in version >= 3. Please use the #validator_for_uri method instead.'
         validator_for_uri(schema_uri)
       end
 
@@ -367,7 +376,7 @@ module JSON
         @@default_validator = v
       end
 
-      def register_format_validator(format, validation_proc, versions = (@@validators.flat_map{ |k, v| v.names.first } + [nil]))
+      def register_format_validator(format, validation_proc, versions = (@@validators.flat_map { |k, v| v.names.first } + [nil]))
         custom_format_validator = JSON::Schema::CustomFormat.new(validation_proc)
         versions.each do |version|
           validator = validator_for_name(version)
@@ -375,14 +384,14 @@ module JSON
         end
       end
 
-      def deregister_format_validator(format, versions = (@@validators.flat_map{ |k, v| v.names.first } + [nil]))
+      def deregister_format_validator(format, versions = (@@validators.flat_map { |k, v| v.names.first } + [nil]))
         versions.each do |version|
           validator = validator_for_name(version)
           validator.formats[format.to_s] = validator.default_formats[format.to_s]
         end
       end
 
-      def restore_default_formats(versions = (@@validators.flat_map{ |k, v| v.names.first } + [nil]))
+      def restore_default_formats(versions = (@@validators.flat_map { |k, v| v.names.first } + [nil]))
         versions.each do |version|
           validator = validator_for_name(version)
           validator.formats = validator.default_formats.clone
@@ -406,7 +415,7 @@ module JSON
           if @@available_json_backends.include?(backend)
             @@json_backend = backend
           else
-            raise JSON::Schema::JsonParseError.new("The JSON backend '#{backend}' could not be found.")
+            raise JSON::Schema::JsonParseError, "The JSON backend '#{backend}' could not be found."
           end
         end
       end
@@ -416,26 +425,26 @@ module JSON
           begin
             MultiJson.respond_to?(:adapter) ? MultiJson.load(s) : MultiJson.decode(s)
           rescue MultiJson::ParseError => e
-            raise JSON::Schema::JsonParseError.new(e.message)
+            raise JSON::Schema::JsonParseError, e.message
           end
         else
           case @@json_backend.to_s
           when 'json'
             begin
-              JSON.parse(s, :quirks_mode => true)
+              JSON.parse(s, quirks_mode: true)
             rescue JSON::ParserError => e
-              raise JSON::Schema::JsonParseError.new(e.message)
+              raise JSON::Schema::JsonParseError, e.message
             end
           when 'yajl'
             begin
               json = StringIO.new(s)
               parser = Yajl::Parser.new
-              parser.parse(json) or raise JSON::Schema::JsonParseError.new("The JSON could not be parsed by yajl")
+              parser.parse(json) or raise(JSON::Schema::JsonParseError, 'The JSON could not be parsed by yajl')
             rescue Yajl::ParseError => e
-              raise JSON::Schema::JsonParseError.new(e.message)
+              raise JSON::Schema::JsonParseError, e.message
             end
           else
-            raise JSON::Schema::JsonParseError.new("No supported JSON parsers found. The following parsers are suported:\n * yajl-ruby\n * json")
+            raise JSON::Schema::JsonParseError, "No supported JSON parsers found. The following parsers are suported:\n * yajl-ruby\n * json"
           end
         end
       end
@@ -474,7 +483,6 @@ module JSON
           end
         end
 
-
         if Gem::Specification::find_all_by_name('yajl-ruby').any?
           require 'yajl'
           @@available_json_backends << 'yajl'
@@ -482,11 +490,11 @@ module JSON
         end
 
         if @@json_backend == 'yajl'
-          @@serializer = lambda{|o| Yajl::Encoder.encode(o) }
+          @@serializer = lambda { |o| Yajl::Encoder.encode(o) }
         elsif @@json_backend == 'json'
-          @@serializer = lambda{|o| JSON.dump(o) }
+          @@serializer = lambda { |o| JSON.dump(o) }
         else
-          @@serializer = lambda{|o| YAML.dump(o) }
+          @@serializer = lambda { |o| YAML.dump(o) }
         end
       end
     end
@@ -495,10 +503,10 @@ module JSON
 
     if Gem::Specification::find_all_by_name('uuidtools').any?
       require 'uuidtools'
-      @@fake_uuid_generator = lambda{|s| UUIDTools::UUID.sha1_create(UUIDTools::UUID_URL_NAMESPACE, s).to_s }
+      @@fake_uuid_generator = lambda { |s| UUIDTools::UUID.sha1_create(UUIDTools::UUID_URL_NAMESPACE, s).to_s }
     else
       require 'json-schema/util/uuid'
-      @@fake_uuid_generator = lambda{|s| JSON::Util::UUID.create_v5(s,JSON::Util::UUID::Nil).to_s }
+      @@fake_uuid_generator = lambda { |s| JSON::Util::UUID.create_v5(s, JSON::Util::UUID::Nil).to_s }
     end
 
     def serialize schema
@@ -554,7 +562,7 @@ module JSON
         end
         self.class.add_schema(schema)
       else
-        raise JSON::Schema::SchemaParseError, "Invalid schema - must be either a string or a hash"
+        raise JSON::Schema::SchemaParseError, 'Invalid schema - must be either a string or a hash'
       end
 
       schema
